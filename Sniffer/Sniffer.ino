@@ -60,15 +60,45 @@ void setup() {
 }
 
 void loop() {
+  /**
+   * choose specific channel ex: 7 to make it faster
+   * if we only interested in our presence (not intruder)
+   * Most popular channels for 2.4 GHz Wi-Fi are 1, 6, and 11,
+   * because they don’t overlap with one another.
+   */
   channel = 1;
   boolean sendMQTT = false;
   wifi_set_channel(channel);
+  /**
+   * Beacon is a packet broadcast sent by the router that synchronizes the wireless network.
+   * A beacon is needed to receive information about the router, included but not limited to SSID
+   * and other parameters. The beacon interval is simply the frequency of the beacon – how often 
+   * the beacon is broadcast by the router. 
+   * Most routers are automatically set to a default of 100 milliseconds.
+   * Most routers allow the user to adjust the beacon interval within a range 
+   * from 20ms to 1000ms (from the default 100ms).
+   * There are a few guidelines that can be used to guide you to the proper
+   * settings for your hardware.
+   * This is why ESP8266 stays 200 ms in each channel to be sure not to meach any beacon message
+   * Approximately it takes about 3 seconds to scan all channels
+   * It can be reduced by uging more than one ESP8266, as it esp8266 is not a multichannel device
+   * example: 
+   * ESP1 (1 - 5)
+   * ESP2 (6 - 10)
+   * ESP3 (11 - 14)
+   * If esp detect a new device, sends a message to MQTT
+   */ 
   while (true) {
     nothing_new++;                          // functions.h Array is not finite, check bounds and adjust if required
     if (nothing_new > 200) {                // monitor channel for 200 ms
       nothing_new = 0;
       channel++;
-      if (channel == 15) break;             // Only scan channels 1 to 14
+      /**
+       * Only scan channels 1 to 14
+       * unless decided only to check specific channel (AP: Access Point)
+       * ex: if (channel == 8) break;
+       */ 
+      if (channel == 15) break;             
       wifi_set_channel(channel);
     }
     /**
@@ -187,8 +217,10 @@ void showDevices() {
 
 void sendDevices() {
   String deviceMac;
-
-  // Setup MQTT
+  /**
+   * Promiscuous mode:
+   * https://en.wikipedia.org/wiki/Promiscuous_mode
+   */ 
   wifi_promiscuous_enable(disable);
   connectToWiFi();
   client.setServer(MQTTServer, MQTTPort);
@@ -210,12 +242,14 @@ void sendDevices() {
   JsonArray& mac = root.createNestedArray("MAC");
   // JsonArray& rssi = root.createNestedArray("RSSI");
 
-  // add Beacons
+  /**
+   * Add bbeacons, only strongest signals
+   */ 
   for (int u = 0; u < aps_known_count; u++) {
     deviceMac = formatMac1(aps_known[u].bssid);
     if (aps_known[u].rssi > MINRSSI) {
       mac.add(deviceMac);
-      //    rssi.add(aps_known[u].rssi);
+      // rssi.add(aps_known[u].rssi);
     }
   }
 
@@ -224,7 +258,7 @@ void sendDevices() {
     deviceMac = formatMac1(clients_known[u].station);
     if (clients_known[u].rssi > MINRSSI) {
       mac.add(deviceMac);
-      //    rssi.add(clients_known[u].rssi);
+      // rssi.add(clients_known[u].rssi);
     }
   }
 
