@@ -29,7 +29,7 @@
 
 int idx = 0;
 
-int targetChannel[] = { 6, 36, 15};
+int targetChannel[] = { 1, 6, 11, 36, 15};
 int channel = targetChannel[idx];
 
 int clients_known_count_old, aps_known_count_old;
