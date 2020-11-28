@@ -27,7 +27,11 @@
 #define PURGETIME 600000
 #define MINRSSI -70
 
-unsigned int channel = 1;
+int idx = 0;
+
+int targetChannel[] = { 6, 36, 15};
+int channel = targetChannel[idx];
+
 int clients_known_count_old, aps_known_count_old;
 unsigned long sendEntry, deleteEntry;
 char jsonString[JBUFFER];
@@ -35,7 +39,7 @@ char jsonString[JBUFFER];
 
 String device[MAXDEVICES];
 int nbrDevices = 0;
-int usedChannels[15];
+// int usedChannels[15];
 
 StaticJsonBuffer<JBUFFER>  jsonBuffer;
 
@@ -66,7 +70,8 @@ void loop() {
    * Most popular channels for 2.4 GHz Wi-Fi are 1, 6, and 11,
    * because they don’t overlap with one another.
    */
-  channel = 1;
+  idx = 0; 
+  channel = targetChannel[idx];
   boolean sendMQTT = false;
   wifi_set_channel(channel);
   /**
@@ -92,13 +97,17 @@ void loop() {
     nothing_new++;                          // functions.h Array is not finite, check bounds and adjust if required
     if (nothing_new > 200) {                // monitor channel for 200 ms
       nothing_new = 0;
-      channel++;
+      idx = idx+1;
+      channel = targetChannel[idx];
       /**
        * Only scan channels 1 to 14
        * unless decided only to check specific channel (AP: Access Point)
        * ex: if (channel == 8) break;
        */ 
-      if (channel == 15) break;             
+      if (channel == 15) {
+        idx = 0;
+        break;            
+      } 
       wifi_set_channel(channel);
     }
     /**
@@ -184,8 +193,8 @@ void purgeDevice() {
 void showDevices() {
   Serial.println("");
   Serial.println("");
-  Serial.println("-------------------Device DB-------------------");
-  Serial.printf("%4d Devices + Clients.\n", aps_known_count + clients_known_count); // show count
+  Serial.println("-------------------Device Database-------------------");
+  Serial.printf("%4d Devices + Clients. Devices (APs): %d clients: %d \n", aps_known_count + clients_known_count, aps_known_count, clients_known_count); // show count
   
   /**
    * Beacon frame is one of the management frames in IEEE 802.11 based WLANs.
@@ -226,8 +235,8 @@ void sendDevices() {
   client.setServer(MQTTServer, MQTTPort);
   while (!client.connected()) {
     Serial.println("Connecting to MQTT ...");
-
-    if (client.connect("ESP32Client", "admin", "admin" )) {
+    if (client.connect("ESP32Client", mqttUser, mqttPassword )) {
+    // if (client.connect("ESP32Client", "admin", "admin" )) {
       Serial.println("connected");
     } else {
       Serial.print("failed with state ");
@@ -243,12 +252,14 @@ void sendDevices() {
   // JsonArray& rssi = root.createNestedArray("RSSI");
 
   /**
-   * Add bbeacons, only strongest signals
+   * Add beacons, only strongest signals
+   * aps, APs (Access Points)
    */ 
   for (int u = 0; u < aps_known_count; u++) {
     deviceMac = formatMac1(aps_known[u].bssid);
-    if (aps_known[u].rssi > MINRSSI) {
+    if ((aps_known[u].rssi > MINRSSI) && (deviceMac == routerMAC)) {
       mac.add(deviceMac);
+      // or regardless rssi
       // rssi.add(aps_known[u].rssi);
     }
   }
@@ -257,8 +268,13 @@ void sendDevices() {
   for (int u = 0; u < clients_known_count; u++) {
     deviceMac = formatMac1(clients_known[u].station);
     if (clients_known[u].rssi > MINRSSI) {
-      mac.add(deviceMac);
+      for (int i = 0; i < 3; i++) { 
+       if(deviceMac == targetDevices[i]) {
+        mac.add(deviceMac);
+      }
+      // or regardless rssi
       // rssi.add(clients_known[u].rssi);
+      }
     }
   }
 
@@ -267,7 +283,7 @@ void sendDevices() {
   root.prettyPrintTo(Serial);
   root.printTo(jsonString);
 
-  if (client.publish("Sniffer", jsonString) == 1) Serial.println("Successfully published");
+  if (client.publish("/esp8266/sniffer", jsonString) == 1) Serial.println("Successfully published");
   else {
     Serial.println();
     Serial.println("Not published. Please add #define MQTT_MAX_PACKET_SIZE 2048 at the beginning of PubSubClient.h file");
