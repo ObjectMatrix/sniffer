@@ -10,3 +10,9 @@ If you’re using the 2.4 GHz band, channels 1, 6, and 11 are usually the best c
 
 ![WiFi](images/channels.png)
 
+## ESP8266 powered with battery 
+Watching AP/WiFi, publish any changes to => MQTT => NODE-RED => Notify Email/SMS
+
+
+![Watch WiFi](images/esp8266-batt.png)
+
